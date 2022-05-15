@@ -1,5 +1,6 @@
 FROM docker.io/debian:11.3-slim
-
+FROM openjdk:11-jre-slim as BUILD
+ARG SCRAPER_NAME
 # manually installing libgl1 to fix some browser crashes
 # and to reduce ubiquitous "Aw, Snap!" errors ("Error code: 6"):
 # > [[...]:angle_platform_impl.cc(43)] Display.cpp:833 (initialize): ANGLE Display::initialize error 12289: Could not dlopen libGL.so.1: [...]
@@ -20,7 +21,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && echo "deb [arch=amd64] https://brave-browser-apt-release.s3.brave.com/ stable main" \
         > /etc/apt/sources.list.d/brave-browser-release.list \
-    && useradd --create-home browser
+    && useradd --create-home ${SCRAPER_NAME}
+
 
 ARG BRAVE_BROWSER_PACKAGE_VERSION=1.38.115
 RUN apt-get update \
@@ -31,19 +33,51 @@ RUN apt-get update \
     && find / -xdev -type f -perm /u+s -exec chmod -c u-s {} \; \
     && find / -xdev -type f -perm /g+s -exec chmod -c g-s {} \;
 
-USER browser
-VOLUME /home/browser
+RUN apt-get update \
+    && apt-get install --yes xvfb \
+    && rm -rf /var/lib/apt/lists/* \
+    && find / -xdev -type f -perm /u+s -exec chmod -c u-s {} \; \
+    && find / -xdev -type f -perm /g+s -exec chmod -c g-s {} \;
+COPY /wrapper.sh /bin
+
 # --disable-dev-shm-usage to fix some "Aw, Snap!" errors and video playback,
 # apparently by resolving:
 # > ERROR:broker_posix.cc(46)] Received unexpected number of handles
 # https://github.com/WPO-Foundation/wptagent/issues/327#issuecomment-614086842
-CMD ["brave-browser", "--no-sandbox"]
+# CMD ["brave-browser", "--no-sandbox", "--incognito", "--remote-debugging-port=9224"]
+# CMD ["sleep", "5"]
+# WORKDIR /bin/runner
+
+COPY /libs/etoro-api-0.1.4.8130.jar /bin/runner/run.jar
+COPY /drivers/chromedriver_8130 /bin
+RUN ["chmod", "+x", "/bin/chromedriver_8130"]
+RUN ["chmod", "+x", "/bin/wrapper.sh"]
+# USER browser_5
+# VOLUME /home/browser_5
+# USER browser_6
+# VOLUME /home/browser_6
+USER ${SCRAPER_NAME}
+VOLUME /home/${SCRAPER_NAME}
+CMD ./bin/wrapper.sh
+# CMD ["ls", "-altr"]
+# COPY ./src /src
+#
+# # WORKDIR /src
+#
+# FROM openjdk:11-jre-slim
+#
+#
+# COPY /wrapper.sh /
+# # CMD ["ls", "-altr"]
+# CMD ["java","-jar","/bin/runner/run.jar"]
+# CMD ["xvfb-run", "-a", "java","-jar","/bin/runner/run.jar"]
+# CMD ./wrapper.sh
 
 # mounts tmpfs at /tmp implicitly
-LABEL podman-run-x11="podman run --name brave_browser --rm --init -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix -v brave_browser_home:/home/browser --shm-size 1GB --read-only --cap-drop ALL --security-opt no-new-privileges \${IMAGE}"
-
-# https://github.com/opencontainers/image-spec/blob/v1.0.1/annotations.md
-ARG REVISION=
-LABEL org.opencontainers.image.title="brave browser" \
-    org.opencontainers.image.source="https://github.com/fphammerle/docker-brave-browser" \
-    org.opencontainers.image.revision="$REVISION"
+# LABEL podman-run-x11="podman run --name brave_browser --rm --init -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix -v brave_browser_home:/home/browser --shm-size 1GB --read-only --cap-drop ALL --security-opt no-new-privileges \${IMAGE}"
+# #
+# # # https://github.com/opencontainers/image-spec/blob/v1.0.1/annotations.md
+# ARG REVISION=
+# LABEL org.opencontainers.image.title="brave browser" \
+#     org.opencontainers.image.source="https://github.com/fphammerle/docker-brave-browser" \
+#     org.opencontainers.image.revision="$REVISION"
