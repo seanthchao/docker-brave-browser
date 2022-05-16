@@ -1,5 +1,5 @@
 #!/bin/bash
-# for i in $(seq 1 10)
+# for i in $(seq 71 80)
 # do
 #   echo "$i"
 #   podman build --build-arg SCRAPER_NAME=browser_"$i" -t etoro_scraper_"$i" . &

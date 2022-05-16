@@ -1,2 +1,2 @@
 #!/bin/bash
-xvfb-run -a Xephyr -resizeable :1
+xvfb-run -a Xephyr :"$1"&
